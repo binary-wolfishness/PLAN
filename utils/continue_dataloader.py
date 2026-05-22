@@ -40,6 +40,9 @@ class GNNDataset_ridge(gdata.Dataset):
         # newdata = self.bandpass(data)
         newdata = self.Z_ScoreNormalization(data)
         newdata = torch.tensor(newdata,dtype = torch.float)
+        required_len = right_index - left_index
+        pad = torch.zeros(newdata.shape[0],newdata.shape[1],required_len - newdata.shape[2])
+        newdata = torch.cat((newdata, pad),dim=2)
         
 
         station_loc = self.cal_distance(index)
@@ -84,7 +87,7 @@ class GNNDataset_ridge(gdata.Dataset):
     def cal_distance(self,index):
         
         station_pandas = pd.read_csv(self.stationfilepath, sep='|')
-        station_pandas = station_pandas.drop([0])
+        # station_pandas = station_pandas.drop([0])
         station_pandas.columns = ['Network', 'Station', 'Latitude','Longitude', 'Elevation', 'Sitename','StartTime', 'EndTime']
         station_pandas['dis'] = 0.0
 

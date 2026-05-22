@@ -138,7 +138,7 @@ class PLAN_Dataset_train(gdata.Dataset):
     def cal_distance(self,index):
         # Here we calculate the offset of each station based on pandas, you can define your own function about it.
         station_pandas = pd.read_csv("./data/gmap-stations.txt", sep='|')
-        station_pandas = station_pandas.drop([0])
+        # station_pandas = station_pandas.drop([0])
         station_pandas.columns = ['Network', 'Station', 'Latitude','Longitude', 'Elevation', 'Sitename','StartTime', 'EndTime']
         station_pandas['dis'] = 0.0
         # For input station position, must norm it based on specific region.
