@@ -51,7 +51,7 @@ def load_model(model_name,model, cpu_avaliable = True):
 
 def load_continous_data(station_file_path,data_file,data_length = 3600):
     station_pandas = pd.read_csv(station_file_path, sep='|')
-    station_pandas = station_pandas.drop([0])
+    # station_pandas = station_pandas.drop([0])
     station_name = station_pandas.iloc[:,1].tolist()
     data = np.zeros([len(station_name),3,data_length*100+1])
     # the sort of channel in data is ZEN , little different with other phase picking method
@@ -75,7 +75,7 @@ def load_continous_data(station_file_path,data_file,data_length = 3600):
 
 def Region_renorm_info(station_file_path):
     station_pandas = pd.read_csv(station_file_path, sep='|')
-    station_pandas = station_pandas.drop([0])
+    # station_pandas = station_pandas.drop([0])
     station_pandas.columns = ['Network', 'Station', 'Latitude','Longitude', 'Elevation', 'Sitename','StartTime', 'EndTime']
     station_pandas['dis'] = 0
 
@@ -141,7 +141,7 @@ def construct_dataloader(data,station_file_path,start_time = 30000,end_time = 70
 
 
 
-def pred(model,data_loader,station_file_path,device,batch_start_time,P_stack_value = 2.4,S_stack_value = 1.2, P_value = 0.24, S_value = 0.12, time_sample = 200, station_num = 4):
+def pred(model,data_loader,station_file_path,device,batch_start_time,P_stack_value = 2.4,S_stack_value = 1.2, P_value = 0.24, S_value = 0.12, time_sample = 200, station_num = 4, time_start=None):
     Latitude_MAX,Latitude_MIN,Longtitude_MAX,Longtitude_MIN,Elevation_MAX = Region_renorm_info(station_file_path)
     
     m = -1
@@ -153,12 +153,13 @@ def pred(model,data_loader,station_file_path,device,batch_start_time,P_stack_val
 
     model.eval()
 
-    for mydata in tqdm(data_loader):
+    for mydata in data_loader:
     
         m += 1
         mydata = mydata.to(device)
         # First Time pred using all stations
-        repred_mask = np.array([True, True,  True,  True,  True,  True,  True,  True, True, True,  True,  True,  True,  True, True, True])
+        # repred_mask = np.array([True, True,  True,  True,  True,  True,  True,  True, True, True,  True,  True,  True,  True, True, True])
+        repred_mask = np.full(mydata.station_loc.shape[0], True)
         # Corresponding to Workflow (1) in Method Section of PLAN paper
         out_p,out_s,pred_loc,pred_depth,dtp,dts,_ = model(mydata.x,mydata.station_loc, mydata.batch,mydata.edge_index)
         # Corresponding to Workflow (2.1) Shift in Method Section of PLAN paper
@@ -182,7 +183,7 @@ def pred(model,data_loader,station_file_path,device,batch_start_time,P_stack_val
         # 1900
             temp_s_time = out_s_sum.argmax() # get argmax position
             temp_p_time = out_p_sum.argmax() # get argmax position
-            train_mask = torch.zeros(mydata.x.shape[0])
+            train_mask = torch.zeros(mydata.x.shape[0])\
 
             for i in range(mydata.x.shape[0]):  
                 # Corresponding to Workflow (3) Stations Selection in Method Section of PLAN paper
@@ -190,9 +191,9 @@ def pred(model,data_loader,station_file_path,device,batch_start_time,P_stack_val
                     train_mask[i] = 1
 
             train_mask = train_mask == 1
-            edge_index_part = cal_edge(train_mask.sum())
+            edge_index_part = cal_edge(train_mask.sum()).to(device)
 
-            if train_mask.sum()<4:
+            if train_mask.sum()<station_num:
                 continue
             # repred and get final picks, offset and depth.
             out_p,out_s,pred_loc,pred_depth,dtp,dts,_ = model(mydata.x[train_mask],mydata.station_loc[train_mask], mydata.batch[train_mask],edge_index_part.T)
@@ -214,9 +215,9 @@ def pred(model,data_loader,station_file_path,device,batch_start_time,P_stack_val
             earthquake_ptime = (temp_pick_sp[:,0] - pred_loc.squeeze().cpu().detach().numpy()*100/6*100).mean()        
 
             earthquake_time = (earthquake_stime + earthquake_ptime)/2
-            earthquake_time = distance_to_time(batch_start_time[m] + earthquake_time, time_start = '2019-07-04 17:30:00.000')
-            earthquake_ptime = distance_to_time(batch_start_time[m] + earthquake_ptime, time_start = '2019-07-04 17:30:00.000')
-            earthquake_stime = distance_to_time(batch_start_time[m] + earthquake_stime, time_start = '2019-07-04 17:30:00.000')
+            earthquake_time = distance_to_time(batch_start_time[m] + earthquake_time, time_start =time_start)
+            earthquake_ptime = distance_to_time(batch_start_time[m] + earthquake_ptime, time_start =time_start)
+            earthquake_stime = distance_to_time(batch_start_time[m] + earthquake_stime, time_start =time_start)
             # Get event time
             earthquake_time_list_p.append(earthquake_ptime)
             earthquake_time_list_s.append(earthquake_stime)
